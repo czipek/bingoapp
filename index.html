@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 BINGO!</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+        }
+
+        .bingo-cell {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+
+        .bingo-cell:hover:not(.marked) {
+            background: rgba(255,255,255,0.15);
+            transform: scale(1.03);
+            border-color: rgba(255,255,255,0.3);
+            box-shadow: 0 0 25px rgba(139, 92, 246, 0.3);
+        }
+
+        .bingo-cell.marked {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .bingo-cell.marked .cell-text {
+            opacity: 0.35;
+        }
+
+        .x-mark {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .bingo-cell.marked .x-mark {
+            opacity: 1;
+        }
+
+        .x-mark::before,
+        .x-mark::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120%;
+            height: 5px;
+            background: linear-gradient(90deg, transparent, #ef4444 15%, #ef4444 85%, transparent);
+            border-radius: 3px;
+            transform-origin: center;
+        }
+
+        .x-mark::before {
+            transform: translate(-50%, -50%) rotate(45deg) scaleX(0);
+        }
+
+        .x-mark::after {
+            transform: translate(-50%, -50%) rotate(-45deg) scaleX(0);
+        }
+
+        .bingo-cell.marked .x-mark::before {
+            animation: slashIn 0.35s ease-out 0.05s forwards;
+        }
+
+        .bingo-cell.marked .x-mark::after {
+            animation: slashIn 0.35s ease-out 0.2s forwards;
+        }
+
+        @keyframes slashIn {
+            to { transform: translate(-50%, -50%) rotate(var(--rot, 45deg)) scaleX(1); }
+        }
+
+        .bingo-cell.marked .x-mark::before { --rot: 45deg; }
+        .bingo-cell.marked .x-mark::after { --rot: -45deg; }
+
+        /* Confetti / particle system */
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            animation: particleFall linear forwards;
+        }
+
+        @keyframes particleFall {
+            0% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .star-particle {
+            font-size: 1.5rem;
+            animation: starFly 1.2s ease-out forwards;
+        }
+
+        @keyframes starFly {
+            0% { opacity: 1; transform: scale(0) rotate(0deg); }
+            50% { opacity: 1; transform: scale(1.3) rotate(180deg); }
+            100% { opacity: 0; transform: scale(0.5) rotate(360deg); }
+        }
+
+        .serpentine {
+            width: 8px;
+            height: 20px;
+            border-radius: 4px;
+            animation: serpentineFall linear forwards;
+        }
+
+        @keyframes serpentineFall {
+            0% { opacity: 1; transform: rotate(0deg) translateY(0); }
+            100% { opacity: 0; transform: rotate(720deg) translateY(100vh); }
+        }
+
+        /* BINGO header */
+        .bingo-title {
+            background: linear-gradient(90deg, #f59e0b, #ef4444, #ec4899, #8b5cf6, #3b82f6);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientMove 3s linear infinite;
+        }
+
+        @keyframes gradientMove {
+            to { background-position: 200% center; }
+        }
+
+        .bingo-win-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .bingo-win-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .win-card {
+            background: linear-gradient(135deg, #1e1b4b, #312e81);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            border-radius: 24px;
+            padding: 3rem;
+            text-align: center;
+            transform: scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 60px rgba(139, 92, 246, 0.4);
+        }
+
+        .bingo-win-overlay.active .win-card {
+            transform: scale(1);
+        }
+
+        .glow-line {
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #8b5cf6, #ec4899, #8b5cf6, transparent);
+            border-radius: 2px;
+        }
+
+        .shuffle-btn {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            transition: all 0.3s ease;
+        }
+
+        .shuffle-btn:hover {
+            background: linear-gradient(135deg, #a78bfa, #7c3aed);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+        }
+
+        .reset-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: all 0.3s ease;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+    <!-- Header -->
+    <div class="text-center mb-6 mt-4">
+        <h1 class="bingo-title text-6xl sm:text-7xl font-black tracking-tight mb-2">BINGO!</h1>
+        <p class="text-white/40 text-sm tracking-widest uppercase">Kliknij pole, aby je zaznaczyć</p>
+        <div class="glow-line w-48 mx-auto mt-3"></div>
+    </div>
+
+    <!-- Score -->
+    <div class="flex items-center gap-4 mb-5">
+        <div class="text-white/50 text-sm">Zaznaczone: <span id="score" class="text-violet-400 font-bold text-lg">0</span> / 16</div>
+    </div>
+
+    <!-- Board -->
+    <div id="board" class="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-2xl mx-auto"></div>
+
+    <!-- Controls -->
+    <div class="flex gap-3 mt-6 mb-8">
+        <button onclick="shuffleBoard()" class="shuffle-btn text-white font-semibold px-6 py-3 rounded-xl text-sm flex items-center gap-2">
+            🔀 Losuj układ
+        </button>
+        <button onclick="resetBoard()" class="reset-btn text-white/70 font-semibold px-6 py-3 rounded-xl text-sm flex items-center gap-2">
+            ↺ Reset
+        </button>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="winOverlay" class="bingo-win-overlay" onclick="closeWin()">
+        <div class="win-card">
+            <div class="text-6xl mb-4">🎉</div>
+            <h2 class="text-4xl font-black text-white mb-2">BINGO!</h2>
+            <p class="text-violet-300 text-lg mb-1">Masz pełną linię!</p>
+            <p class="text-white/40 text-sm mt-4">Kliknij aby zamknąć</p>
+        </div>
+    </div>
+
+    <script>
+        const PHRASES = [
+            "Dżi i", "Gynvael", "Muszę to skończyć dzisiaj", "Ansible, Terraform",
+            "Banach", "Błażej", "Zifkon", "Websockety",
+            "U nas w Allegro", "VirtualBox", "Totemy/Recepcja", "Git/Repozytorium",
+            "RedCore", "Brak MFA to podatność", "Purple", "Infra Mirka"
+        ];
+
+        let currentOrder = [];
+        let markedCells = new Set();
+        let bingoAchieved = new Set();
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            currentOrder.forEach((phrase, idx) => {
+                const cell = document.createElement('div');
+                cell.className = 'bingo-cell rounded-xl sm:rounded-2xl p-2 sm:p-4 flex items-center justify-center text-center aspect-square';
+                cell.dataset.index = idx;
+                cell.innerHTML = `
+                    <span class="cell-text text-white font-semibold text-xs sm:text-sm leading-tight select-none">${phrase}</span>
+                    <div class="x-mark"></div>
+                `;
+                if (markedCells.has(idx)) {
+                    cell.classList.add('marked');
+                }
+                cell.addEventListener('click', () => toggleCell(idx, cell));
+                board.appendChild(cell);
+            });
+            updateScore();
+        }
+
+        function toggleCell(idx, cell) {
+            if (markedCells.has(idx)) {
+                markedCells.delete(idx);
+                cell.classList.remove('marked');
+            } else {
+                markedCells.add(idx);
+                cell.classList.add('marked');
+
+                // Check if it's Błażej
+                if (currentOrder[idx] === "Błażej") {
+                    const rect = cell.getBoundingClientRect();
+                    blazejCelebration(rect);
+                }
+            }
+            updateScore();
+            checkBingo();
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = markedCells.size;
+        }
+
+        function checkBingo() {
+            const lines = [
+                // Rows
+                [0,1,2,3], [4,5,6,7], [8,9,10,11], [12,13,14,15],
+                // Columns
+                [0,4,8,12], [1,5,9,13], [2,6,10,14], [3,7,11,15],
+                // Diagonals
+                [0,5,10,15], [3,6,9,12]
+            ];
+
+            for (const line of lines) {
+                const key = line.join('-');
+                if (line.every(i => markedCells.has(i)) && !bingoAchieved.has(key)) {
+                    bingoAchieved.add(key);
+                    showBingoWin();
+                    massConfetti();
+                }
+            }
+        }
+
+        function showBingoWin() {
+            document.getElementById('winOverlay').classList.add('active');
+        }
+
+        function closeWin() {
+            document.getElementById('winOverlay').classList.remove('active');
+        }
+
+        function shuffleBoard() {
+            currentOrder = shuffle(PHRASES);
+            markedCells.clear();
+            bingoAchieved.clear();
+            renderBoard();
+        }
+
+        function resetBoard() {
+            markedCells.clear();
+            bingoAchieved.clear();
+            renderBoard();
+        }
+
+        // ====== CONFETTI & CELEBRATION SYSTEM ======
+
+        function blazejCelebration(rect) {
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            // Stars burst
+            const stars = ['⭐', '🌟', '✨', '💫', '🎉', '🎊', '🥳', '🔥', '💜', '🎆'];
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => spawnStar(cx, cy, stars[i % stars.length]), i * 30);
+            }
+
+            // Serpentines
+            const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => spawnSerpentine(cx, cy, colors[i % colors.length]), i * 20);
+            }
+
+            // Confetti squares
+            for (let i = 0; i < 60; i++) {
+                setTimeout(() => spawnConfetti(cx, cy, colors[i % colors.length]), i * 15);
+            }
+        }
+
+        function spawnStar(cx, cy, emoji) {
+            const el = document.createElement('div');
+            el.className = 'particle star-particle';
+            el.textContent = emoji;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 80 + Math.random() * 200;
+            const tx = cx + Math.cos(angle) * dist;
+            const ty = cy + Math.sin(angle) * dist - 50;
+            el.style.left = cx + 'px';
+            el.style.top = cy + 'px';
+            el.style.fontSize = (1 + Math.random() * 1.5) + 'rem';
+            el.style.transition = 'left 0.8s ease-out, top 0.8s ease-out';
+            document.body.appendChild(el);
+            requestAnimationFrame(() => {
+                el.style.left = tx + 'px';
+                el.style.top = ty + 'px';
+            });
+            setTimeout(() => el.remove(), 1200);
+        }
+
+        function spawnSerpentine(cx, cy, color) {
+            const el = document.createElement('div');
+            el.className = 'particle serpentine';
+            el.style.background = color;
+            el.style.left = (cx + (Math.random() - 0.5) * 200) + 'px';
+            el.style.top = (cy - Math.random() * 60) + 'px';
+            el.style.width = (5 + Math.random() * 6) + 'px';
+            el.style.height = (15 + Math.random() * 20) + 'px';
+            el.style.borderRadius = '3px';
+            const duration = 1.5 + Math.random() * 2;
+            el.style.animationDuration = duration + 's';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), duration * 1000);
+        }
+
+        function spawnConfetti(cx, cy, color) {
+            const el = document.createElement('div');
+            el.className = 'particle';
+            el.style.background = color;
+            el.style.width = (6 + Math.random() * 8) + 'px';
+            el.style.height = (6 + Math.random() * 8) + 'px';
+            el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+            const startX = cx + (Math.random() - 0.5) * 100;
+            const startY = cy;
+            el.style.left = startX + 'px';
+            el.style.top = startY + 'px';
+            el.style.opacity = '1';
+            document.body.appendChild(el);
+
+            const vx = (Math.random() - 0.5) * 8;
+            let vy = -(4 + Math.random() * 8);
+            const gravity = 0.15;
+            let x = startX, y = startY;
+            let rotation = 0;
+            const rotSpeed = (Math.random() - 0.5) * 15;
+            let frame = 0;
+
+            function animate() {
+                vy += gravity;
+                x += vx;
+                y += vy;
+                rotation += rotSpeed;
+                frame++;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                el.style.transform = `rotate(${rotation}deg)`;
+                if (frame > 50) {
+                    el.style.opacity = Math.max(0, 1 - (frame - 50) / 30);
+                }
+                if (frame < 80 && y < window.innerHeight + 50) {
+                    requestAnimationFrame(animate);
+                } else {
+                    el.remove();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function massConfetti() {
+            const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
+            for (let i = 0; i < 100; i++) {
+                setTimeout(() => {
+                    const cx = Math.random() * window.innerWidth;
+                    const cy = -20;
+                    const el = document.createElement('div');
+                    el.className = 'particle';
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    el.style.background = color;
+                    el.style.width = (6 + Math.random() * 8) + 'px';
+                    el.style.height = (6 + Math.random() * 8) + 'px';
+                    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                    el.style.left = cx + 'px';
+                    el.style.top = cy + 'px';
+                    document.body.appendChild(el);
+
+                    let vy = 2 + Math.random() * 3;
+                    const vx = (Math.random() - 0.5) * 3;
+                    let x = cx, y = cy;
+                    let rotation = 0;
+                    const rotSpeed = (Math.random() - 0.5) * 10;
+                    let frame = 0;
+
+                    function animate() {
+                        y += vy;
+                        x += vx + Math.sin(frame * 0.05) * 0.5;
+                        rotation += rotSpeed;
+                        frame++;
+                        el.style.left = x + 'px';
+                        el.style.top = y + 'px';
+                        el.style.transform = `rotate(${rotation}deg)`;
+                        if (y < window.innerHeight + 50) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            el.remove();
+                        }
+                    }
+                    requestAnimationFrame(animate);
+                }, i * 20);
+            }
+        }
+
+        // Initialize
+        shuffleBoard();
+    </script>
+</body>
+</html>
