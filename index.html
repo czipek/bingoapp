@@ -166,6 +166,7 @@
             transform: scale(0.5);
             transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
             box-shadow: 0 0 60px rgba(139, 92, 246, 0.4);
+            max-width: 90%;
         }
 
         .bingo-win-overlay.active .win-card {
@@ -228,13 +229,23 @@
         </button>
     </div>
 
-    <!-- Win overlay -->
+    <!-- Single Line Win overlay -->
     <div id="winOverlay" class="bingo-win-overlay" onclick="closeWin()">
         <div class="win-card">
             <div class="text-6xl mb-4">🎉</div>
             <h2 class="text-4xl font-black text-white mb-2">BINGO!</h2>
             <p class="text-violet-300 text-lg mb-1">Masz pełną linię!</p>
             <p class="text-white/40 text-sm mt-4">Kliknij aby zamknąć</p>
+        </div>
+    </div>
+
+    <!-- Two Lines Win overlay -->
+    <div id="twoLinesOverlay" class="bingo-win-overlay" onclick="closeTwoLinesWin()">
+        <div class="win-card" style="background: linear-gradient(135deg, #064e3b, #065f46); border-color: #10b981; box-shadow: 0 0 60px rgba(16, 185, 129, 0.4);">
+            <div class="text-6xl mb-4 text-center">🚀 🤩 🎉</div>
+            <h2 class="text-3xl sm:text-4xl font-black text-white mb-3">Hej zuchu, świetnie sobie radzisz!</h2>
+            <p class="text-emerald-300 text-xl font-bold mb-1">Nie zwalniaj tempa!</p>
+            <p class="text-white/40 text-sm mt-6">Kliknij aby zamknąć</p>
         </div>
     </div>
 
@@ -249,6 +260,7 @@
         let currentOrder = [];
         let markedCells = new Set();
         let bingoAchieved = new Set();
+        let twoLinesShown = false;
 
         function shuffle(arr) {
             const a = [...arr];
@@ -311,12 +323,25 @@
                 [0,5,10,15], [3,6,9,12]
             ];
 
+            let newlyAchieved = 0;
+
             for (const line of lines) {
                 const key = line.join('-');
                 if (line.every(i => markedCells.has(i)) && !bingoAchieved.has(key)) {
                     bingoAchieved.add(key);
+                    newlyAchieved++;
+                }
+            }
+
+            if (newlyAchieved > 0) {
+                massConfetti();
+                
+                // Sprawdzenie, czy to drugie BINGO
+                if (bingoAchieved.size >= 2 && !twoLinesShown) {
+                    showTwoLinesWin();
+                    twoLinesShown = true;
+                } else {
                     showBingoWin();
-                    massConfetti();
                 }
             }
         }
@@ -328,17 +353,27 @@
         function closeWin() {
             document.getElementById('winOverlay').classList.remove('active');
         }
+        
+        function showTwoLinesWin() {
+            document.getElementById('twoLinesOverlay').classList.add('active');
+        }
+
+        function closeTwoLinesWin() {
+            document.getElementById('twoLinesOverlay').classList.remove('active');
+        }
 
         function shuffleBoard() {
             currentOrder = shuffle(PHRASES);
             markedCells.clear();
             bingoAchieved.clear();
+            twoLinesShown = false;
             renderBoard();
         }
 
         function resetBoard() {
             markedCells.clear();
             bingoAchieved.clear();
+            twoLinesShown = false;
             renderBoard();
         }
 
